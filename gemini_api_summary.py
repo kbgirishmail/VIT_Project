@@ -9,6 +9,9 @@ import google.generativeai as genai
 from datetime import datetime
 import re
 from dotenv import load_dotenv
+# Add these imports to your main script
+from priority_system import calculate_priority, categorize_emails
+from notification_system import handle_critical_email
 
 
 # Gmail API configuration
@@ -201,6 +204,44 @@ def summarize_emails(emails):
 #             print("-" * 50)
 #     except Exception as e:
 #         print(f"Error listing models: {str(e)}")
+
+# Add this to your main function or where you process emails
+def process_emails_with_notifications(emails):
+    """Process emails with summarization and notifications"""
+    for email in emails:
+        # Use your existing summarization logic
+        if 'content' in email and not 'summary' in email:
+            email['summary'] = summarize_with_gemini(email['content'], email['subject'])
+        
+        # Calculate priority
+        email['priority_score'] = calculate_priority(email)
+        
+        # Handle critical emails immediately
+        if email['priority_score'] >= 50:  # Critical threshold
+            print(f"Critical email detected: {email['subject']}")
+            handle_critical_email(email)
+    
+    # Return categorized emails
+    return categorize_emails(emails)
+
+# Then update your main function to use this
+if __name__ == '__main__':
+    try:
+        print("Fetching emails from inbox...")
+        emails = fetch_emails(max_results=5)
+        if not emails:
+            print("No emails found.")
+        else:
+            print(f"Found {len(emails)} emails. Processing...")
+            categorized_emails = process_emails_with_notifications(emails)
+            print(f"Critical emails: {len(categorized_emails['critical'])}")
+            print(f"High priority emails: {len(categorized_emails['high'])}")
+            
+            # You can still use your existing summarization display
+            summarize_emails(emails)
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
 
 if __name__ == '__main__':
     try:

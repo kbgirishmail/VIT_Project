@@ -1,0 +1,38 @@
+{
+    "user_email": "your-email@gmail.com",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_username": "your-email@gmail.com",
+    "smtp_password": "your-app-password",
+    
+    "vip_contacts": [
+        "boss@company.com",
+        "important-client@example.com",
+        "family@example.com"
+    ],
+    
+    "custom_keywords": [
+        "urgent",
+        "deadline",
+        "project",
+        "meeting",
+        "review"
+    ],
+    
+    "notification_settings": {
+        "push_threshold": 50,
+        "whatsapp_threshold": 75,
+        "email_notification": true
+    },
+    
+    "device_tokens": [
+        "your-firebase-device-token"
+    ],
+    
+    "twilio_whatsapp_number": "+16089388821",
+    "user_whatsapp_number": "+916281954503",
+    
+    "daily_digest_time": "17:00",
+    "weekly_digest_day": "monday",
+    "weekly_digest_time": "09:00"
+}

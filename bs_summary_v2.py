@@ -8,6 +8,9 @@ from googleapiclient.discovery import build
 from transformers import pipeline
 from datetime import datetime
 import re
+# Add these imports to your main script
+from priority_system import calculate_priority, categorize_emails
+from notification_system import handle_critical_email
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
