@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from email_fetcher import fetch_emails_since # Correct import
-# from llm_handler import summarize_email # Import if needed for fallback
+from llm_handler import summarize_email, extract_action_items, detect_intent_and_sentiment, classify_email # Import if needed for fallback
 from priority_system import calculate_priority, categorize_emails # Need these here now
 
 
@@ -158,13 +158,48 @@ def run_digest(config, period="daily", days=1): # Pass config
              # This indicates the main loop didn't process/store it properly.
              # Add fallback summarization IF NEEDED, but ideally it's done already.
              print(f"Warning: Re-summarizing email {email.get('id')} for digest.")
-             # from llm_handler import summarize_email # Requires llm_handler to be initialized
-             # email['summary'] = summarize_email(email['content'], email['subject']) # Add error handling
+            #  from llm_handler import summarize_email # Requires llm_handler to be initialized
+             try:
+                email['summary'] = summarize_email(email['content'], email['subject'])
+             except Exception as e:
+                print(f"Error summarizing email {email.get('id')}: {e}")
+                email['summary'] = "Error: Unable to summarize email."
+
+        # Re-classify if classification is missing
+        if 'classification' not in email:
+            print(f"Warning: Re-classifying email {email.get('id')} for digest.")
+            try:
+                email['classification'] = classify_email(email['content'], email['subject'])
+            except Exception as e:
+                print(f"Error classifying email {email.get('id')}: {e}")
+                email['classification'] = "Error: Unable to classify email."
+
+        # Re-detect intent and sentiment if missing
+        if 'intent' not in email or 'sentiment' not in email:
+            print(f"Warning: Re-detecting intent and sentiment for email {email.get('id')} for digest.")
+            try:
+                email['intent'], email['sentiment'] = detect_intent_and_sentiment(email['content'])
+            except Exception as e:
+                print(f"Error detecting intent/sentiment for email {email.get('id')}: {e}")
+                email['intent'] = "Error: Unable to detect intent"
+                email['sentiment'] = "Error: Unable to detect sentiment"
+
+        # Re-extract action items if missing
+        if 'action_items' not in email:
+            print(f"Warning: Re-extracting action items for email {email.get('id')} for digest.")
+            try:
+                email['action_items'] = extract_action_items(email['content'])
+            except Exception as e:
+                print(f"Error extracting action items for email {email.get('id')}: {e}")
+                email['action_items'] = ["Error: Unable to extract action items"]
 
         # Ensure priority is calculated and categorized
         if 'priority_category' not in email:
             print(f"Warning: Re-calculating priority for email {email.get('id')} for digest.")
-            calculate_priority(email, config) # Modifies email dict in place
+            calculate_priority(email, config)  # Modifies email dict in place
+
+        # Print priority for debugging
+        print(f"Email ID: {email.get('id', 'Unknown')} | Priority Score: {email.get('priority_score', 'Unknown')}\n")
 
         processed_for_digest.append(email)
 
@@ -204,24 +239,24 @@ def setup_scheduled_digests():
     weekly_time = config.get('weekly_digest_time', '09:00')
     
     # Set up daily digest
-    schedule.every().day.at(daily_time).do(lambda: run_digest(period="daily", days=1))
+    schedule.every().day.at(daily_time).do(lambda: run_digest(config, period="daily", days=1))
     print(f"Daily digest scheduled for {daily_time}")
-    
+
     # Set up weekly digest
     if weekly_day == 'monday':
-        schedule.every().monday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().monday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'tuesday':
-        schedule.every().tuesday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().tuesday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'wednesday':
-        schedule.every().wednesday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().wednesday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'thursday':
-        schedule.every().thursday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().thursday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'friday':
-        schedule.every().friday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().friday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'saturday':
-        schedule.every().saturday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().saturday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     elif weekly_day == 'sunday':
-        schedule.every().sunday.at(weekly_time).do(lambda: run_digest(period="weekly", days=7))
+        schedule.every().sunday.at(weekly_time).do(lambda: run_digest(config, period="weekly", days=7))
     
     print(f"Weekly digest scheduled for {weekly_day.capitalize()} at {weekly_time}")
     

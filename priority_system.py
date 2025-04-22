@@ -86,7 +86,7 @@ def calculate_priority(email_data, config): # Pass config explicitly
     # 2. Sender-based score
     is_vip = any(vip in sender_email for vip in vip_contacts)
     if is_vip:
-        base_score += 30
+        base_score += 40
         if sentiment == "Negative": # Negative from VIP is important
              base_score += 10
 

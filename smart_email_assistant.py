@@ -200,10 +200,10 @@ def process_single_email(raw_email, config):
              llm_error = True
 
         # 5. Smart Replies (Optional)
-        # reply_result = llm_handler.suggest_replies(processed_data['summary'])
-        # processed_data['smart_replies'] = reply_result
-        # if reply_result and isinstance(reply_result, list) and reply_result[0].startswith("Error:"):
-        #      llm_error = True
+        reply_result = llm_handler.suggest_replies(processed_data['summary'])
+        processed_data['smart_replies'] = reply_result
+        if reply_result and isinstance(reply_result, list) and reply_result[0].startswith("Error:"):
+             llm_error = True
 
         # --- Priority Calculation ---
         # Calculate priority even if LLM had errors, might use other factors
@@ -225,6 +225,7 @@ def process_single_email(raw_email, config):
         print(f"  -> Summary: {processed_data.get('summary', 'N/A')[:70]}...")
         print(f"  -> Classification: {processed_data.get('classification', 'N/A')}")
         print(f"  -> Intent: {processed_data.get('intent', 'N/A')}, Sentiment: {processed_data.get('sentiment', 'N/A')}")
+        print(f"  -> Action Items: {processed_data.get('action_items', 'N/A')}")
         print(f"  -> Priority: {processed_data.get('priority_score', 'N/A')} ({processed_data.get('priority_category', 'N/A')})")
         if llm_error: print("  -> !! Note: One or more LLM calls failed for this email.")
 
@@ -318,13 +319,13 @@ def start_email_monitoring(config):
         time.sleep(sleep_time)
 
 # --- Keep start_digest_service as is ---
-def start_digest_service(config):
+def start_digest_service():
     """Start scheduled digest service"""
     try:
         import schedule
         print("Attempting to start scheduled digest service...")
         # Ensure setup_scheduled_digests accepts config
-        digest_system.setup_scheduled_digests(config) # Pass config
+        digest_system.setup_scheduled_digests() # Pass config
         print("Digest service scheduler setup complete (runs based on schedule).")
         return True
     except ImportError:
@@ -394,7 +395,23 @@ def test_whatsapp_notification(config):
 
 # --- Updated Function for Recent Summary ---
 def send_recent_summary(config, count):
-    """Fetches, summarizes, and sends the latest N emails."""
+    """
+    Fetches, summarizes, and sends the latest N emails.
+
+    Parameters:
+        config (dict): A dictionary containing configuration settings. Expected keys include:
+            - 'notification_rules': A dictionary with notification preferences (e.g., 'whatsapp_enabled').
+            - 'smtp_server': SMTP server address for sending emails.
+            - 'smtp_port': Port number for the SMTP server.
+            - 'smtp_username': Username for the SMTP server.
+            - 'user_email': The user's email address.
+            - 'smtp_password': (Optional) Password for the SMTP server, or it can be set in the environment variable 'SMTP_PASSWORD'.
+        count (int): The number of recent emails to fetch and summarize.
+
+    Returns:
+        bool: True if the summary was successfully generated and sent, False otherwise.
+    """
+
     print(f"Fetching latest {count} emails for summary report...")
     try:
         # Fetch latest N emails from inbox
@@ -420,6 +437,11 @@ def send_recent_summary(config, count):
             processed_list.append(processed_email)
             # Removed time.sleep() - Now handled in llm_handler
 
+        # --- Filter Emails for WhatsApp ---
+        rules = config.get('notification_rules', {})
+        notify_whatsapp_for = rules.get('notify_whatsapp_for', [])
+        whatsapp_emails = [email for email in processed_list if email.get('priority_category') in notify_whatsapp_for]
+
         # --- Format the Summary Message ---
         text_report_parts = [f"** Recent Email Summary ({len(processed_list)} Emails) **\n"]
         html_report_parts = [
@@ -435,24 +457,37 @@ def send_recent_summary(config, count):
             sender = item.get('from', 'N/A')
             summary = item.get('summary', 'N/A')
             if summary.startswith("Error:") or summary == "Processing Error":
-                 summary = f"[{summary} - Check original email]"
+                summary = f"[{summary} - Check original email]"
+
+            action_items = item.get('action_items', [])
+            if action_items and isinstance(action_items, list) and action_items[0].startswith("Error:"):
+                action_items = ["Error: Unable to extract action items"]
             date = item.get('date', '')
             category = item.get('priority_category', 'N/A')
             score = item.get('priority_score', 'N/A')
+            reply_suggest = item.get('smart_replies', [])
 
-            # Text Part
-            text_report_parts.append(f"--- Email {i+1} ({category.capitalize()}/{score}) ---")
-            text_report_parts.append(f"Date: {date}")
-            text_report_parts.append(f"From: {sender}")
-            text_report_parts.append(f"Subject: {subject}")
-            text_report_parts.append(f"Summary: {summary}\n")
 
-            # HTML Part
+            # --- Populate WhatsApp Report (Filtered Emails) ---
+            if item in whatsapp_emails:
+                text_report_parts.append(f"*--- Email {i+1} ({category.capitalize()}/{score}) ---*")
+                text_report_parts.append(f"*Date:* {date}")
+                text_report_parts.append(f"*From:* {sender}")
+                text_report_parts.append(f"*Subject:* {subject}")
+                text_report_parts.append(f"*Summary:* {summary}")
+                if reply_suggest:
+                    text_report_parts.append(f"*Suggested Replies:* {'\n'.join(reply_suggest)}\n")
+
+            # --- Populate Email Report (All Emails) ---
             html_report_parts.append("<hr>")
             html_report_parts.append(f"<p><strong>From:</strong> {sender}<br>")
             html_report_parts.append(f"<strong>Subject:</strong> {subject}<br>")
             html_report_parts.append(f"<strong>Date:</strong> {date} ({category.capitalize()}/{score})<br>")
             html_report_parts.append(f"<strong>Summary:</strong> {summary}</p>")
+            if action_items:
+                html_report_parts.append(f"<p><strong>Action Items:</strong> {', '.join(action_items)}</p>")
+            if reply_suggest:
+                html_report_parts.append(f"<p><strong>Suggested Replies:</strong> {'\n'.join(reply_suggest)}</p>")
 
 
         text_report = "\n".join(text_report_parts)
@@ -470,18 +505,17 @@ def send_recent_summary(config, count):
              text_report_truncated = text_report
 
         # --- Send Notifications ---
-        rules = config.get('notification_rules', {})
         whatsapp_enabled = rules.get('whatsapp_enabled', False) and notification_system.TWILIO_AVAILABLE
         email_config_present = all(k in config and config[k] for k in ['smtp_server', 'smtp_port', 'smtp_username', 'user_email']) and (config.get('smtp_password') or os.getenv('SMTP_PASSWORD'))
 
         # Send via WhatsApp if enabled
-        if whatsapp_enabled:
-             whatsapp_data = {'summary': text_report_truncated}
-             print("Sending recent summary via WhatsApp...")
-             notification_system.send_whatsapp_notification(whatsapp_data, config)
+        if whatsapp_enabled and whatsapp_emails:
+            whatsapp_data = {'summary': text_report_truncated}
+            print(f"Sending recent summary via WhatsApp for priorities: {', '.join(notify_whatsapp_for)}...")
+            notification_system.send_whatsapp_notification(whatsapp_data, config)
         else:
-            print("WhatsApp notifications disabled or Twilio not available. Skipping.")
-
+            print("WhatsApp notifications disabled, Twilio not available, or no matching emails. Skipping.")
+        
         # Send via Email if configured
         if email_config_present:
              if hasattr(notification_system, 'send_custom_email'):
@@ -560,7 +594,7 @@ def main():
     elif args.start_digest_service:
         mode_selected = True
         print("--- Attempting to Start Digest Service ---")
-        if start_digest_service(config):
+        if start_digest_service():
              print("Digest service thread started. Press Ctrl+C to stop.")
              try:
                  while True: time.sleep(60)
@@ -576,9 +610,11 @@ def main():
         parser.print_help(sys.stderr)
         print("\nExample Usage:")
         print("  python smart_email_assistant.py --monitor")
-        print("  python smart_email_assistant.py --recent")
+        print("  python smart_email_assistant.py --recent") # Recent 10 emails extract
         print("  python smart_email_assistant.py --recent 5")
         print("  python smart_email_assistant.py --run-digest daily")
+        print("  python smart_email_assistant.py --run-digest weekly")
+        print("  python smart_email_assistant.py --start-digest-service")
         print("  python smart_email_assistant.py --process-batch 15")
         print("  python smart_email_assistant.py --setup-config")
         print("  python smart_email_assistant.py --test-whatsapp")
