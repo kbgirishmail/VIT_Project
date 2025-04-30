@@ -1,0 +1,47 @@
+{
+    "user_email": // Your email address for notifications,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_username": // Your email address for SMTP authentication,
+    "smtp_password": // Your SMTP password,
+    
+    "vip_contacts": [
+        "boss@company.com",
+        "important-client@example.com",
+        "family@example.com"
+    ],
+    
+    "custom_keywords": [
+        "urgent",
+        "deadline",
+        "project",
+        "meeting",
+        "review"
+    ],
+    
+    "notification_settings": {
+        "push_threshold": 50,
+        "whatsapp_threshold": 75,
+        "email_notification": true
+    },
+
+    "notification_rules": {
+        "whatsapp_enabled": true,  
+        "push_enabled": false,
+        "email_enabled": true,     
+        "notify_whatsapp_for": ["critical"],
+        "notify_push_for": ["critical", "high"],
+        "notify_email_for": ["critical"]
+    },
+    
+    "device_tokens": [
+        "your-firebase-device-token"
+    ],
+    
+    "twilio_whatsapp_number": "//api.twilio.com/v1/whatsapp", //number from which you send WhatsApp messages
+    "user_whatsapp_number": "",// your WhatsApp number
+    
+    "daily_digest_time": "17:00",
+    "weekly_digest_day": "monday",
+    "weekly_digest_time": "09:00"
+}
