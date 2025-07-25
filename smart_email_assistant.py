@@ -10,9 +10,9 @@ from datetime import datetime # Added for timestamp printing
 # Import your modules (at the top level)
 try:
     import email_fetcher
-    import llm_handler # Renamed from gemini_api_summary
+    import llm_handler
     import priority_system
-    import notification_system # Import the module itself
+    import notification_system
     import digest_system
     from dotenv import load_dotenv
 except ImportError as e:
@@ -359,7 +359,14 @@ def process_batch_emails(config, count=10):
         for category, email_list in categorized.items():
             print(f"{category.capitalize()} priority: {len(email_list)} emails")
         print("------------------------------")
+
+        #gpt - After processing emails:
+        with open("processed_emails.json", "w") as f:
+            json.dump(processed_list, f, indent=4)
+        print("✅ Saved processed emails to 'processed_emails.json'")
+
         return True
+     
     except Exception as e:
         print(f"Error processing batch emails: {str(e)}")
         return False
@@ -534,8 +541,39 @@ def send_recent_summary(config, count):
         print(f"Error generating or sending recent summary: {str(e)}")
         import traceback
         traceback.print_exc()
-        return False
+        return False    
 
+
+# --- Grouping and Summarizing Threads in smart_email_assistant.py --- chat-gpt modefic recent
+def group_emails_by_thread(email_list):
+    """Group emails by their threadId."""
+    grouped = {}
+    for email in email_list:
+        thread_id = email.get('threadId')
+        if thread_id not in grouped:
+            grouped[thread_id] = []
+        grouped[thread_id].append(email)
+    return grouped
+
+def summarize_email_threads(email_groups):
+    """Summarize each thread as a whole."""
+    thread_summaries = {}
+    for thread_id, emails in email_groups.items():
+        combined_content = "\n\n".join([
+            f"Subject: {e.get('subject', 'No Subject')}\n{e.get('snippet', '')}" for e in emails
+        ])
+        summary = llm_handler.summarize_email(combined_content)
+        thread_summaries[thread_id] = summary
+        for email in emails:
+            email['thread_summary'] = summary  # Attach to each email
+    return thread_summaries
+
+# Example Usage:
+# fetched_emails = fetch_emails_since(days=1)
+# grouped_threads = group_emails_by_thread(fetched_emails)
+# summarize_email_threads(grouped_threads)
+
+#........ end chat gpt
 
 # --- Main Execution ---
 def main():

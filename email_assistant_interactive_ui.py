@@ -2,10 +2,31 @@
 import streamlit as st
 import pandas as pd
 import json
+import subprocess
 from datetime import datetime
+import sys
 
 st.set_page_config(page_title="LLM Email Assistant Dashboard", layout="wide")
 st.title("📬 LLM-Powered Email Assistant Dashboard")
+
+PYTHON_PATH = sys.executable  # Use the current Python executable
+
+def fetch_emails(batch_size):
+    try:
+        with st.spinner("Fetching emails... Please wait."):
+            result = subprocess.run(
+                [PYTHON_PATH, "smart_email_assistant.py", "--process-batch", str(batch_size)],
+                capture_output=True,
+                text=True
+            )
+        st.success(f"Emails fetched successfully (Batch size: {batch_size})")
+        with st.expander("🔧 Script Output (stdout)"):
+            st.text(result.stdout or "No output")
+        with st.expander("⚠️ Script Errors (stderr)"):
+            st.text(result.stderr or "No errors")
+    except Exception as e:
+        st.error(f"🚨 Failed to run script: {e}")
+
 
 # Load processed emails from JSON
 def load_processed_emails(path='processed_emails.json'):
@@ -16,12 +37,20 @@ def load_processed_emails(path='processed_emails.json'):
         st.error(f"Error loading email data: {e}")
         return []
 
+# Sidebar for Fetching new emails
+st.sidebar.header("📥 Fetch New Emails")
+batch_size = st.sidebar.number_input("Number of emails to fetch", min_value=1, max_value=50, value=5, step=1)
+if st.sidebar.button("Fetch Emails"):
+    print(f"Fetching {batch_size} emails...")
+    fetch_emails(batch_size)
+    # st.rerun()  # Reload page to reflect new emails
+
 emails = load_processed_emails()
 if not emails:
     st.warning("No emails found in processed_emails.json.")
     st.stop()
 
-# Convert to DataFrame for analysis
+# Convert to DataFrame
 df = pd.DataFrame(emails)
 
 # Sidebar filters
@@ -37,10 +66,11 @@ filtered = df[df['priority_category'].isin(category_filter) & df['from'].isin(se
 # Summary Cards
 st.subheader("📊 Email Priority Distribution")
 priority_counts = filtered['priority_category'].value_counts()
-st.columns(4)[0].metric("Critical", priority_counts.get("critical", 0))
-st.columns(4)[1].metric("High", priority_counts.get("high", 0))
-st.columns(4)[2].metric("Medium", priority_counts.get("medium", 0))
-st.columns(4)[3].metric("Low", priority_counts.get("low", 0))
+cols = st.columns(4)
+cols[0].metric("Critical", priority_counts.get("critical", 0))
+cols[1].metric("High", priority_counts.get("high", 0))
+cols[2].metric("Medium", priority_counts.get("medium", 0))
+cols[3].metric("Low", priority_counts.get("low", 0))
 
 # Interactive Reply & Priority UI
 st.subheader("💌 Email Interaction & Reply")
@@ -51,7 +81,7 @@ for idx, email in filtered.iterrows():
 
         reply = st.radio(
             f"💬 Suggested Reply (ID: {email['id']})",
-            email.get('suggested_replies', ["No suggestions."]),
+            ["No reply"] + email.get('smart_replies', ["No suggestions."]),
             index=0,
             key=f"reply_{idx}"
         )

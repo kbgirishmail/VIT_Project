@@ -117,8 +117,8 @@ def calculate_priority(email_data, config): # Pass config explicitly
          base_score += 5
 
     # 7. Recent interaction (optional boost)
-    # if has_recent_interaction(sender_email):
-    #     base_score += 5
+    if has_recent_interaction(sender_email):
+        base_score += 5
 
     # Ensure score is not below 0
     score = max(0, base_score)
