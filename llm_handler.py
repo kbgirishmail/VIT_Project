@@ -21,7 +21,8 @@ if not GEMINI_API_KEY:
 else:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model_name = 'models/gemini-1.5-flash'
+        model_name = 'models/gemini-2.5-flash-lite'
+
         model = genai.GenerativeModel(model_name)
         print(f"Successfully initialized Gemini model: {model_name}")
     except Exception as e:

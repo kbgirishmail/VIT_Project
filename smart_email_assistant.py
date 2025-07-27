@@ -26,6 +26,9 @@ ENV_FILE = '.env' # Make sure you have a .env file for API keys
 PROCESSED_IDS_FILE = 'processed_email_ids.json' # Added for persistence
 LAST_CHECK_FILE = 'last_check_timestamp.txt' # Added for persistence
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # --- Config Setup ---
 # Keep setup_config() function as is
 def setup_config():
